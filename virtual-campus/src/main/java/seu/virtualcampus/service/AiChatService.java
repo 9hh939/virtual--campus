@@ -149,39 +149,38 @@ public class AiChatService {
      * @param callback  每次AI回复新内容时的回调（chunk为本次增量内容）
      * @throws RuntimeException 如果会话不存在
      */
+    @Autowired
+    private seu.virtualcampus.ai.CampusAssistant campusAssistant;
+
+    /**
+     * 重构后的流式处理：通过 LangChain4j AiServices 驱动，支持 Function Calling
+     */
     public void handleChatStream(Integer sessionId, String userMsg, Consumer<String> callback) {
         AiSession session = aiSessionMapper.getSessionById(sessionId);
         if (session == null) throw new RuntimeException("会话不存在");
 
-        List<AiMessage> history = aiMessageMapper.getMessagesBySessionId(sessionId);
-        List<String> roles = new ArrayList<>();
-        List<String> contents = new ArrayList<>();
-        for (AiMessage msg : history) {
-            roles.add(msg.getRole());
-            contents.add(msg.getContent());
-        }
-        roles.add("user");
-        contents.add(userMsg);
-
         StringBuilder aiResponseBuilder = new StringBuilder();
-        // 调用流式 API
-        chatStream(roles, contents)
-                .doOnNext(chunk -> {
+
+        // session.getUsername() 获取的就是当前登录用户的真实ID
+        campusAssistant.chat(sessionId, session.getUsername(), userMsg)
+                .onNext(chunk -> {
                     aiResponseBuilder.append(chunk);
                     callback.accept(chunk);
                 })
-                .doOnComplete(() -> {
-                    // 用异步线程池执行，避免阻塞reactor线程
+                .onComplete(response -> {
                     CompletableFuture.runAsync(() -> {
                         try {
-                            String aiResponse = aiResponseBuilder.toString();
-                            updateSession(sessionId, aiResponse, userMsg);
+                            // 将最终回答写入数据库
+                            updateSession(sessionId, aiResponseBuilder.toString(), userMsg);
                         } catch (Exception e) {
-                            Logger.getLogger(this.getClass().getName()).severe("异步更新会话失败: " + e.getMessage());
+                            System.err.println("异步更新会话失败: " + e.getMessage());
                         }
                     });
                 })
-                .subscribe();
+                .onError(error -> {
+                    callback.accept("\n[AI 思考时遇到一点小问题：" + error.getMessage() + "]");
+                })
+                .start();
     }
 
     /**

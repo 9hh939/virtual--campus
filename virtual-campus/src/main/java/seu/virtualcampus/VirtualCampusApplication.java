@@ -2,6 +2,8 @@ package seu.virtualcampus;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
@@ -17,6 +19,8 @@ import java.nio.charset.StandardCharsets;
  * 它还包含了对日志系统进行UTF-8编码配置的初始化代码，以确保日志中的中文字符能够正确显示。
  */
 @SpringBootApplication
+@EnableTransactionManagement // 开启声明式事务支持
+@EnableCaching             // 开启缓存支持
 public class VirtualCampusApplication {
 
 	/**

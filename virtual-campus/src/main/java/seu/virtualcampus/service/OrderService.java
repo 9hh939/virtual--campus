@@ -127,7 +127,7 @@ public class OrderService {
      * @param cartItemIds 购物车项ID列表，可为空。
      * @return 包含订单ID、金额等信息的结果Map。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createOrder(String userId, List<String> cartItemIds) {
         Map<String, Object> result = new HashMap<>();
 
@@ -231,7 +231,7 @@ public class OrderService {
      * @param paymentMethod 支付方式（如“立即付款”“先用后付”）。
      * @return 支付结果信息Map。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> payOrder(String userId, String orderId, String accountNumber, String password, String paymentMethod) {
         Map<String, Object> result = new HashMap<>();
 
@@ -368,7 +368,7 @@ public class OrderService {
      * @param orderId 订单ID。
      * @return 操作结果信息Map。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> confirmOrder(String userId, String orderId) {
         Map<String, Object> result = new HashMap<>();
 
@@ -416,7 +416,7 @@ public class OrderService {
      * @param orderId 订单ID。
      * @return 操作结果信息Map。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> deliverOrder(String adminId, String orderId) {
         Map<String, Object> result = new HashMap<>();
 
@@ -465,7 +465,7 @@ public class OrderService {
      * @param orderId 订单ID。
      * @return 操作结果信息Map。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> cancelOrder(String userId, String orderId) {
         Map<String, Object> result = new HashMap<>();
 

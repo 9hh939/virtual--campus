@@ -1,6 +1,8 @@
 package seu.virtualcampus.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import seu.virtualcampus.domain.Product;
@@ -27,6 +29,7 @@ public class ProductService {
      *
      * @return 所有商品列表。
      */
+    @Cacheable(value = "productsCache")
     public List<Product> getAllProducts() {
         return productMapper.selectAll();
     }
@@ -168,7 +171,8 @@ public class ProductService {
      * @param product 商品对象。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int addProduct(Product product) {
         // 自动生成ID和设置默认状态
         if (product.getProductId() == null || product.getProductId().isEmpty()) {
@@ -186,7 +190,8 @@ public class ProductService {
      * @param product 商品对象。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int updateProduct(Product product) {
         return productMapper.update(product);
     }
@@ -197,7 +202,8 @@ public class ProductService {
      * @param id 商品ID。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int deleteProduct(String id) {
         return productMapper.deleteById(id);
     }
@@ -256,6 +262,7 @@ public class ProductService {
      * @param keyword 关键字。
      * @return 匹配的商品列表。
      */
+    @Cacheable(value = "productsCache")
     public List<Product> searchProducts(String keyword) {
         return productMapper.searchProducts(keyword);
     }
