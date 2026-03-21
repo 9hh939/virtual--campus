@@ -3,6 +3,7 @@ package seu.virtualcampus.mapper;
 
 import org.apache.ibatis.annotations.*;
 import seu.virtualcampus.domain.BankAccount;
+import org.apache.ibatis.annotations.Select;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -31,6 +32,11 @@ public interface BankAccountMapper {
      */
     @Select("SELECT * FROM bank_account WHERE userId = #{userId}")
     List<BankAccount> selectByUserId(String userId);
+    /**
+     * 根据学号/用户ID查询银行账户
+     */
+    @Select("SELECT * FROM bank_account WHERE userId = #{userId}")
+    BankAccount selectByUserId1(String userId);
 
     /**
      * 插入一个新的银行账户记录。

@@ -30,6 +30,21 @@ public class BankAccountService {
     @Autowired
     private TransactionMapper transactionMapper;
 
+
+    /**
+     * 根据 userId 获取账户信息 (专为 AI 和跨模块调用设计)
+     *
+     * @param userId 用户的学号/工号
+     * @return 对应的银行账户对象
+     */
+    public BankAccount getAccountByUserId(String userId) {
+        BankAccount account = bankAccountMapper.selectByUserId1(userId);
+        // 如果查不到，说明这个学生还没开通虚拟银行卡
+        if (account == null) {
+            throw new RuntimeException("account not found for user: " + userId);
+        }
+        return account;
+    }
     /**
      * 创建新账户。
      *
