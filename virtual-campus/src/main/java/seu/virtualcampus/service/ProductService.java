@@ -29,7 +29,7 @@ public class ProductService {
      *
      * @return 所有商品列表。
      */
-    @Cacheable(value = "productsCache")
+    @Cacheable(value = "productsCache", key = "'all'")
     public List<Product> getAllProducts() {
         return productMapper.selectAll();
     }
@@ -56,13 +56,13 @@ public class ProductService {
      * @param search 关键字。
      * @return 分页过滤后的商品列表。
      */
+    @Cacheable(
+            value = "productsCache",
+            key = "'page:' + #page + ':size:' + #size + ':sort:' + (#sort == null ? '' : #sort) + ':status:' + (#status == null ? '' : #status) + ':search:' + (#search == null ? '' : #search)"
+    )
     public List<Product> getAllProducts(Integer page, Integer size, String sort, String status, String search) {
-        // 计算偏移量
         int offset = (page - 1) * size;
-
-        // 处理排序参数
         String orderBy = parseSort(sort);
-
         return productMapper.selectPaged(offset, size, orderBy, normalizeStatus(status), normalizeSearch(search));
     }
 
@@ -86,8 +86,6 @@ public class ProductService {
         return productMapper.countByFilter(normalizeStatus(status), normalizeSearch(search));
     }
 
-    // 私有方法：解析排序参数，包含白名单验证
-
     /**
      * 解析排序参数。
      *
@@ -96,34 +94,28 @@ public class ProductService {
      */
     private String parseSort(String sort) {
         if (sort == null || sort.trim().isEmpty()) {
-            return "productName ASC"; // 默认排序
+            return "productName ASC";
         }
 
-        // 字段映射白名单
         java.util.Map<String, String> fieldMapping = new java.util.HashMap<>();
         fieldMapping.put("name", "productName");
         fieldMapping.put("price", "productPrice");
         fieldMapping.put("stock", "availableCount");
         fieldMapping.put("type", "productType");
 
-        // 解析排序字符串 (例: "price,asc" 或 "name,desc")
         String[] parts = sort.split(",");
         if (parts.length != 2) {
-            return "productName ASC"; // 格式错误，使用默认
+            return "productName ASC";
         }
 
         String field = parts[0].trim();
         String direction = parts[1].trim().toUpperCase();
-
-        // 验证字段白名单
         String mappedField = fieldMapping.get(field);
         if (mappedField == null) {
-            return "productName ASC"; // 字段不在白名单，使用默认
+            return "productName ASC";
         }
-
-        // 验证排序方向
         if (!"ASC".equals(direction) && !"DESC".equals(direction)) {
-            direction = "ASC"; // 方向无效，使用默认
+            direction = "ASC";
         }
 
         return mappedField + " " + direction;
@@ -140,7 +132,7 @@ public class ProductService {
         String s = status.trim().toUpperCase();
         if ("ON".equals(s) || "ACTIVE".equals(s)) return "ACTIVE";
         if ("OFF".equals(s) || "INACTIVE".equals(s)) return "INACTIVE";
-        return null; // 非法值忽略
+        return null;
     }
 
     /**
@@ -174,7 +166,6 @@ public class ProductService {
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(value = "productsCache", allEntries = true)
     public int addProduct(Product product) {
-        // 自动生成ID和设置默认状态
         if (product.getProductId() == null || product.getProductId().isEmpty()) {
             product.setProductId(generateProductId());
         }
@@ -215,12 +206,11 @@ public class ProductService {
      * @param status 新状态。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int changeProductStatus(String id, String status) {
         return productMapper.updateStatus(id, status);
     }
-
-    // ========== 扩展功能方法 ==========
 
     /**
      * 根据类型获取商品。
@@ -239,7 +229,8 @@ public class ProductService {
      * @param quantity  减少数量。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int reduceStock(String productId, Integer quantity) {
         return productMapper.reduceStock(productId, quantity);
     }
@@ -251,7 +242,8 @@ public class ProductService {
      * @param quantity  增加数量。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int increaseStock(String productId, Integer quantity) {
         return productMapper.increaseStock(productId, quantity);
     }
@@ -262,7 +254,7 @@ public class ProductService {
      * @param keyword 关键字。
      * @return 匹配的商品列表。
      */
-    @Cacheable(value = "productsCache")
+    @Cacheable(value = "productsCache", key = "'search:' + (#keyword == null ? '' : #keyword)")
     public List<Product> searchProducts(String keyword) {
         return productMapper.searchProducts(keyword);
     }
@@ -283,9 +275,9 @@ public class ProductService {
      * @param products 商品列表。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int addProductsBatch(List<Product> products) {
-        // 为批量商品设置默认值
         for (Product product : products) {
             if (product.getProductId() == null || product.getProductId().isEmpty()) {
                 product.setProductId(generateProductId());
@@ -303,12 +295,11 @@ public class ProductService {
      * @param productIds 商品ID列表。
      * @return 受影响的行数。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "productsCache", allEntries = true)
     public int removeProductsByIds(List<String> productIds) {
         return productMapper.deleteByIds(productIds);
     }
-
-    // ========== 私有辅助方法 ==========
 
     private String generateProductId() {
         return "PROD" + System.currentTimeMillis() + String.format("%04d", (int) (Math.random() * 10000));

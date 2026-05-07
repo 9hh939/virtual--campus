@@ -1,6 +1,8 @@
 package seu.virtualcampus.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import seu.virtualcampus.domain.Course;
@@ -31,9 +33,9 @@ public class CourseService {
      *
      * @param course 课程对象。
      */
-    // 增加课程
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "courseHallCache", allEntries = true)
     public void courseAdd(Course course) {
-        // 设置新课程的已选人数为0
         course.setCoursePeopleNumber(0);
         courseMapper.courseAdd(course);
     }
@@ -43,14 +45,11 @@ public class CourseService {
      *
      * @param courseId 课程ID。
      */
-    // 删除课程
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "courseHallCache", allEntries = true)
     public void courseDelete(String courseId) {
-        // 先删除所有选课记录
         courseSelectionMapper.findSelectionsByCourseId(courseId)
-                .forEach(selection ->
-                        dropCourse(selection.getStudentId(), courseId));
-        // 再删除课程
+                .forEach(selection -> dropCourse(selection.getStudentId(), courseId));
         courseMapper.courseDelete(courseId);
     }
 
@@ -59,15 +58,13 @@ public class CourseService {
      *
      * @param course 课程对象。
      */
-    // 更新课程
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "courseHallCache", allEntries = true)
     public void courseUpdate(Course course) {
-        // 先获取原有课程的选课人数
         Course existingCourse = courseMapper.courseFind(course.getCourseId());
         if (existingCourse != null) {
-            // 保留原有的选课人数
             course.setCoursePeopleNumber(existingCourse.getCoursePeopleNumber());
         } else {
-            // 如果课程不存在，设置默认值0
             course.setCoursePeopleNumber(0);
         }
         courseMapper.courseUpdate(course);
@@ -79,7 +76,6 @@ public class CourseService {
      * @param courseId 课程ID。
      * @return 对应的课程对象，若不存在则返回null。
      */
-    // 查询课程
     public Course courseFind(String courseId) {
         return courseMapper.courseFind(courseId);
     }
@@ -89,7 +85,7 @@ public class CourseService {
      *
      * @return 所有课程列表。
      */
-    // 获取所有课程
+    @Cacheable(value = "courseHallCache", key = "'allCourses'")
     public List<Course> getAllCourses() {
         return courseMapper.findAllCourses();
     }
@@ -100,7 +96,6 @@ public class CourseService {
      * @param courseId 课程ID。
      * @return 课程统计信息对象。
      */
-    // 统计选课情况
     public CourseStats getCourseStats(String courseId) {
         return courseMapper.getCourseStats(courseId);
     }
@@ -112,36 +107,33 @@ public class CourseService {
      * @param courseId  课程ID。
      * @return 选课成功返回true，否则返回false。
      */
-    // 学生选课
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "courseHallCache", allEntries = true)
     public boolean selectCourse(String studentId, String courseId) {
         Course course = courseMapper.courseFind(courseId);
         if (course == null) {
-            return false; // 课程不存在
+            return false;
         }
 
         if (course.getCoursePeopleNumber() >= course.getCourseCapacity()) {
-            return false; // 课程已满
+            return false;
         }
 
         if (courseSelectionMapper.checkSelection(studentId, courseId) > 0) {
-            return false; // 已选过该课程
+            return false;
         }
 
-        // 检查时间冲突
         List<String> conflicts = checkCourseConflicts(studentId, courseId);
         if (!conflicts.isEmpty()) {
-            return false; // 存在时间冲突
+            return false;
         }
 
-        // 插入选课记录
         CourseSelection selection = new CourseSelection();
         selection.setStudentId(studentId);
         selection.setCourseId(courseId);
         int result = courseSelectionMapper.selectCourse(selection);
 
         if (result > 0) {
-            // 更新课程选课人数
             course.setCoursePeopleNumber(course.getCoursePeopleNumber() + 1);
             courseMapper.courseUpdate(course);
             return true;
@@ -157,18 +149,17 @@ public class CourseService {
      * @param courseId  课程ID。
      * @return 退课成功返回true，否则返回false。
      */
-    // 学生退课
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "courseHallCache", allEntries = true)
     public boolean dropCourse(String studentId, String courseId) {
         Course course = courseMapper.courseFind(courseId);
         if (course == null) {
-            return false; // 课程不存在
+            return false;
         }
 
         int result = courseSelectionMapper.dropCourse(studentId, courseId);
 
         if (result > 0) {
-            // 更新课程选课人数
             course.setCoursePeopleNumber(course.getCoursePeopleNumber() - 1);
             courseMapper.courseUpdate(course);
             return true;
@@ -183,7 +174,6 @@ public class CourseService {
      * @param studentId 学生ID。
      * @return 学生已选课程列表。
      */
-    // 获取学生已选课程
     public List<Course> getStudentCourses(String studentId) {
         return courseSelectionMapper.findSelectionsByStudentId(studentId).stream()
                 .map(selection -> courseMapper.courseFind(selection.getCourseId()))
@@ -197,7 +187,6 @@ public class CourseService {
      * @param courseId  课程ID。
      * @return 如果已选则返回true，否则返回false。
      */
-    // 检查学生是否已选某课程
     public boolean isCourseSelected(String studentId, String courseId) {
         return courseSelectionMapper.checkSelection(studentId, courseId) > 0;
     }
@@ -208,7 +197,6 @@ public class CourseService {
      * @param courseId 课程ID。
      * @return 选课人数。
      */
-    // 获取课程选课人数
     public int getCourseEnrollmentCount(String courseId) {
         return courseSelectionMapper.getEnrollmentCount(courseId);
     }
@@ -219,15 +207,12 @@ public class CourseService {
      * @param studentId 学生ID。
      * @return 学生课程表。
      */
-    // 获取学生课程表（按星期和节数组织）
     public Map<String, Map<String, List<Course>>> getStudentTimetable(String studentId) {
         List<Course> courses = getStudentCourses(studentId);
         return organizeCoursesByPeriod(courses);
     }
 
-    // 按星期和节数组织课程
     private Map<String, Map<String, List<Course>>> organizeCoursesByPeriod(List<Course> courses) {
-        // 初始化课程表结构
         Map<String, Map<String, List<Course>>> timetable = new LinkedHashMap<>();
         String[] days = {"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
         String[] periods = {"1-2节", "3-4节", "5-6节", "7-8节", "9-10节", "11-12节"};
@@ -239,10 +224,8 @@ public class CourseService {
             }
         }
 
-        // 填充课程表
         for (Course course : courses) {
             if (course.getCourseTime() != null && !course.getCourseTime().isEmpty()) {
-                // 解析课程时间，格式如 "周一 1-2节, 周三 3-4节"
                 String[] timeParts = course.getCourseTime().split(",");
 
                 for (String timePart : timeParts) {
@@ -253,12 +236,10 @@ public class CourseService {
                         String day = dayAndPeriod[0];
                         String period = dayAndPeriod[1];
 
-                        // 确保节数格式正确
                         if (!period.endsWith("节")) {
                             period = period + "节";
                         }
 
-                        // 添加到课程表
                         if (timetable.containsKey(day) && timetable.get(day).containsKey(period)) {
                             timetable.get(day).get(period).add(course);
                         }
@@ -270,7 +251,6 @@ public class CourseService {
         return timetable;
     }
 
-    // 检查课程冲突
     public List<String> checkCourseConflicts(String studentId, String courseId) {
         List<String> conflicts = new ArrayList<>();
         Course newCourse = courseMapper.courseFind(courseId);
@@ -279,10 +259,7 @@ public class CourseService {
             return conflicts;
         }
 
-        // 获取学生已选课程
         List<Course> selectedCourses = getStudentCourses(studentId);
-
-        // 解析新课程的时间
         String[] newCourseTimeParts = newCourse.getCourseTime().split(",");
         Set<String> newCourseTimes = new HashSet<>();
 
@@ -291,7 +268,6 @@ public class CourseService {
             newCourseTimes.add(timePart);
         }
 
-        // 检查与已选课程的时间冲突
         for (Course selectedCourse : selectedCourses) {
             if (selectedCourse.getCourseTime() != null) {
                 String[] selectedCourseTimeParts = selectedCourse.getCourseTime().split(",");
@@ -300,7 +276,6 @@ public class CourseService {
                     selectedTimePart = selectedTimePart.trim();
 
                     for (String newTimePart : newCourseTimes) {
-                        // 如果星期和节数都相同，则存在冲突
                         if (newTimePart.equals(selectedTimePart)) {
                             conflicts.add(selectedCourse.getCourseName() + " (" + selectedCourse.getCourseTime() + ")");
                             break;
@@ -323,12 +298,9 @@ public class CourseService {
      * @param studentId 学生ID。
      * @return 可选课程列表。
      */
-    // 获取可选课程（排除已选和冲突课程）
     public List<Course> getAvailableCourses(String studentId) {
         List<Course> allCourses = getAllCourses();
         List<Course> selectedCourses = getStudentCourses(studentId);
-
-        // 过滤掉已选课程
 
         return allCourses.stream()
                 .filter(course -> selectedCourses.stream()
@@ -343,11 +315,9 @@ public class CourseService {
      * @param major     专业名称。
      * @return 推荐课程列表。
      */
-    // 获取推荐课程（基于学生已选课程和专业）
     public List<Course> getRecommendedCourses(String studentId, String major) {
         List<Course> availableCourses = getAvailableCourses(studentId);
 
-        // 简单的推荐逻辑：优先推荐同专业的课程
         if (major != null && !major.isEmpty()) {
             return availableCourses.stream()
                     .filter(course -> course.getCourseName().contains(major) ||

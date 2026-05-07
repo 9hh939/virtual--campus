@@ -104,7 +104,7 @@ public class AiChatService {
             try {
                 // 1. 组装发给 Python 的数据 (带上学号，供 Python 进行鉴权和数据库查询)
                 Map<String, String> requestBody = new HashMap<>();
-                requestBody.put("session_id", String.valueOf(session.getUsername()));
+                requestBody.put("user_id", String.valueOf(session.getUsername()));
                 requestBody.put("message", userMsg);
 
                 // 2. 发起 HTTP POST 请求到 Python 大脑

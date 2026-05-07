@@ -159,6 +159,11 @@ public class BankAccountService {
             throw new RuntimeException("Invalid password");
         }
 
+        // 校验取款金额必须大于 0
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("withdrawal amount must be > zero");
+        }
+
         // 检查余额是否充足
         if (account.getBalance().compareTo(amount) < 0) {
             throw new RuntimeException("Insufficient balance");
@@ -222,6 +227,11 @@ public class BankAccountService {
         // 检查不能转账给自己
         if (fromAccount.equals(toAccount)) {
             throw new RuntimeException("cannot transfer to the same account");
+        }
+
+        // 校验转账金额必须大于 0
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("transfer amount must be > zero");
         }
 
         // 检查余额是否充足
